@@ -2,5 +2,7 @@
   "name": "Huella Diaria",
   "description": "App Android para estudiantes y trabajadores que se movilizan a diario: registro de trayectos, control de gastos en pasajes y combustible, y métricas de impacto de tiempo y huella de CO2.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

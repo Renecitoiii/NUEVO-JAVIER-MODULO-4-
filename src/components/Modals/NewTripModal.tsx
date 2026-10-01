@@ -37,6 +37,31 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({
   });
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
+  const [waterIntakeMl, setWaterIntakeMl] = useState<number>(250);
+
+  // Auto calculate estimated duration based on transport mode average urban speed
+  const calculateEstimatedDuration = (km: number, tMode: TransportMode): number => {
+    const modeSpeeds: Record<TransportMode, { speedKmH: number; bufferMin: number }> = {
+      walking: { speedKmH: 4.8, bufferMin: 0 },
+      bicycle: { speedKmH: 15.0, bufferMin: 2 },
+      scooter: { speedKmH: 18.0, bufferMin: 2 },
+      metro: { speedKmH: 32.0, bufferMin: 5 }, // wait time in station
+      bus: { speedKmH: 19.0, bufferMin: 6 }, // stops and traffic
+      motorcycle: { speedKmH: 30.0, bufferMin: 3 },
+      car: { speedKmH: 25.0, bufferMin: 5 }, // urban lights
+      taxi: { speedKmH: 25.0, bufferMin: 4 },
+    };
+
+    const cfg = modeSpeeds[tMode] || { speedKmH: 20, bufferMin: 3 };
+    const travelMinutes = Math.round((km / cfg.speedKmH) * 60);
+    return Math.max(5, travelMinutes + cfg.bufferMin);
+  };
+
+  const handleDistanceChange = (newKm: number) => {
+    setDistanceKm(newKm);
+    const est = calculateEstimatedDuration(newKm, mode);
+    setDurationMinutes(est);
+  };
 
   if (!isOpen) return null;
 
@@ -65,6 +90,7 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({
       co2SavedKg,
       isFavorite,
       notes: notes.trim(),
+      waterIntakeMl: waterIntakeMl > 0 ? waterIntakeMl : undefined,
     });
 
     onClose();
@@ -222,16 +248,20 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({
                 step="0.1"
                 min="0.1"
                 value={distanceKm}
-                onChange={(e) => setDistanceKm(parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs font-mono"
+                onChange={(e) => handleDistanceChange(parseFloat(e.target.value) || 0)}
+                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#2ECC71] text-xs font-mono"
               />
               <div className="flex gap-1 mt-1">
                 {[2, 5, 8.5, 12].map((km) => (
                   <button
                     key={km}
                     type="button"
-                    onClick={() => setDistanceKm(km)}
-                    className="flex-1 text-[9px] py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                    onClick={() => handleDistanceChange(km)}
+                    className={`flex-1 text-[9px] py-0.5 rounded border transition-colors ${
+                      distanceKm === km
+                        ? 'bg-[#2ECC71]/20 text-[#2ECC71] border-[#2ECC71]/40 font-bold'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                    }`}
                   >
                     {km}k
                   </button>
@@ -242,14 +272,14 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({
             <div>
               <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
                 <span>Duración (min)</span>
-                <span className="text-amber-400 font-bold">{durationMinutes} min</span>
+                <span className="text-[#2ECC71] font-bold font-mono">{durationMinutes} min</span>
               </label>
               <input
                 type="number"
                 min="1"
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(parseInt(e.target.value, 10) || 0)}
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs font-mono"
+                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#2ECC71] text-xs font-mono"
               />
               <div className="flex gap-1 mt-1">
                 {[15, 30, 45, 60].map((m) => (
@@ -257,13 +287,31 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({
                     key={m}
                     type="button"
                     onClick={() => setDurationMinutes(m)}
-                    className="flex-1 text-[9px] py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                    className="flex-1 text-[9px] py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700"
                   >
                     {m}m
                   </button>
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Quick Auto-Estimate Time Hint */}
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-xl bg-[#2C3E50]/60 border border-slate-700/60 text-[10px]">
+            <span className="text-slate-400 flex items-center gap-1">
+              <span>⚡</span> Tiempo estimado para {TRANSPORT_MODES[mode]?.label?.split('/')[0]}:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const est = calculateEstimatedDuration(distanceKm, mode);
+                setDurationMinutes(est);
+                if (soundEnabled) playHapticSound('tap');
+              }}
+              className="text-[#2ECC71] font-bold hover:underline"
+            >
+              Recalcular ({calculateEstimatedDuration(distanceKm, mode)} min)
+            </button>
           </div>
 
           {/* Time & Cost */}
@@ -293,6 +341,37 @@ export const NewTripModal: React.FC<NewTripModalProps> = ({
                 placeholder="0.00"
                 className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs font-mono"
               />
+            </div>
+          </div>
+
+          {/* Water Intake during this commute */}
+          <div className="p-3 rounded-2xl bg-cyan-950/30 border border-cyan-500/30">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-cyan-300 font-bold flex items-center gap-1.5 text-xs">
+                <span>💧</span> ¿Tomaste agua durante el trayecto?
+              </label>
+              <span className="text-cyan-400 font-mono font-bold text-xs">
+                {waterIntakeMl > 0 ? `+${waterIntakeMl} ml` : 'Sin agua'}
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              {[0, 150, 250, 500].map((ml) => (
+                <button
+                  key={ml}
+                  type="button"
+                  onClick={() => {
+                    setWaterIntakeMl(ml);
+                    if (soundEnabled) playHapticSound('tap');
+                  }}
+                  className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold transition-all ${
+                    waterIntakeMl === ml
+                      ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm'
+                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+                  }`}
+                >
+                  {ml === 0 ? 'No tomé' : `+${ml} ml`}
+                </button>
+              ))}
             </div>
           </div>
 

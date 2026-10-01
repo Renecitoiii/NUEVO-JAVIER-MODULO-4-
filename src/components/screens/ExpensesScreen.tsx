@@ -13,9 +13,11 @@ import {
   DollarSign, 
   Filter,
   Layers,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  ShieldAlert
 } from 'lucide-react';
-import { Expense, ExpenseCategory, PaymentMethod, UserProfile } from '../../types';
+import { Expense, ExpenseCategory, PaymentMethod, UserProfile, AppTheme } from '../../types';
 import { EXPENSE_CATEGORIES } from '../../utils/transportUtils';
 import { ExpenseCategoryIcon } from '../TransportIcon';
 import { playHapticSound } from '../../utils/haptics';
@@ -23,6 +25,7 @@ import { playHapticSound } from '../../utils/haptics';
 interface ExpensesScreenProps {
   expenses: Expense[];
   userProfile: UserProfile;
+  theme?: AppTheme;
   onAddExpense: (expense: Omit<Expense, 'id'>) => void;
   onDeleteExpense: (id: string) => void;
 }
@@ -30,11 +33,14 @@ interface ExpensesScreenProps {
 export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   expenses,
   userProfile,
+  theme = 'dark',
   onAddExpense,
   onDeleteExpense,
 }) => {
+  const isDark = theme === 'dark';
+
   // Form State
-  const [activeTypeTab, setActiveTypeTab] = useState<'pasaje' | 'gasolina' | 'recarga' | 'otro'>('pasaje');
+  const [activeTypeTab, setActiveTypeTab] = useState<'pasaje' | 'gasolina' | 'peaje' | 'recarga' | 'otro'>('pasaje');
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>('pasaje_metro');
   const [amount, setAmount] = useState<string>('1.25');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('tarjeta_transporte');
@@ -57,7 +63,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   const monthExpenses = expenses.filter((e) => e.date.startsWith(currentMonthPrefix));
   const totalMonthSpent = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // Category breakdown
+  // Category breakdown: Pasajes, Combustible, Peajes
   const publicTransitSpent = monthExpenses
     .filter((e) => EXPENSE_CATEGORIES[e.category]?.isPublicTransit)
     .reduce((sum, e) => sum + e.amount, 0);
@@ -66,18 +72,28 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
     .filter((e) => EXPENSE_CATEGORIES[e.category]?.isFuel)
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const otherSpent = totalMonthSpent - publicTransitSpent - fuelSpent;
+  const peajesSpent = monthExpenses
+    .filter((e) => e.category === 'peaje')
+    .reduce((sum, e) => sum + e.amount, 0);
 
-  // Percentage of daily budget used
+  const otherSpent = totalMonthSpent - publicTransitSpent - fuelSpent - peajesSpent;
+
+  // Percentage of daily and monthly budget used (MetaPresupuesto)
   const dailyBudgetPercent = Math.min(100, Math.round((totalTodaySpent / userProfile.dailyBudget) * 100));
-  const monthlyBudgetPercent = Math.min(100, Math.round((totalMonthSpent / userProfile.monthlyBudget) * 100));
+  const monthlyBudgetPercent = Math.round((totalMonthSpent / userProfile.monthlyBudget) * 100);
+
+  // Budget alert flags
+  const isWarningBudget = monthlyBudgetPercent >= 80 && monthlyBudgetPercent < 100;
+  const isOverBudget = monthlyBudgetPercent >= 100;
 
   // Quick Amount presets
   const quickAmounts = activeTypeTab === 'gasolina'
     ? [10, 20, 30, 50]
+    : activeTypeTab === 'peaje'
+    ? [1.50, 2.50, 3.50, 5.00, 8.00]
     : [1.00, 1.25, 1.50, 2.50, 5.00, 10.00];
 
-  const handleTypeTabChange = (type: 'pasaje' | 'gasolina' | 'recarga' | 'otro') => {
+  const handleTypeTabChange = (type: 'pasaje' | 'gasolina' | 'peaje' | 'recarga' | 'otro') => {
     setActiveTypeTab(type);
     if (userProfile.soundEnabled) playHapticSound('tap');
 
@@ -91,6 +107,11 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
       setAmount('25.00');
       setPaymentMethod('tarjeta_debito');
       setNote('Carga de combustible');
+    } else if (type === 'peaje') {
+      setSelectedCategory('peaje');
+      setAmount('2.50');
+      setPaymentMethod('tarjeta_transporte');
+      setNote('Pago de peaje en autopista');
     } else if (type === 'recarga') {
       setSelectedCategory('recarga_tarjeta');
       setAmount('15.00');
@@ -168,96 +189,215 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
 
       {/* Success Notification */}
       {isSuccessToast && (
-        <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+        <div className="p-3 rounded-2xl bg-[#2ECC71]/20 border border-[#2ECC71]/40 text-[#2ECC71] text-xs font-semibold flex items-center justify-between animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2">
-            <Check size={16} className="text-emerald-400" />
+            <Check size={16} className="text-[#2ECC71]" />
             <span>{isSuccessToast}</span>
           </div>
-          <span className="text-[10px] bg-emerald-500/30 px-2 py-0.5 rounded-full font-mono">OK</span>
+          <span className="text-[10px] bg-[#2ECC71]/30 px-2 py-0.5 rounded-full font-mono">OK</span>
+        </div>
+      )}
+
+      {/* Monthly Budget Alert Banners */}
+      {isOverBudget && (
+        <div className="p-3 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <ShieldAlert size={18} className="text-rose-400 shrink-0" />
+          <div>
+            <p className="font-bold">¡Límite mensual excedido ({monthlyBudgetPercent}%)!</p>
+            <p className="text-[10px] text-rose-300/80">
+              Has gastado {userProfile.currency}{totalMonthSpent.toFixed(2)} de tu límite mensual de {userProfile.currency}{userProfile.monthlyBudget.toFixed(2)}.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isWarningBudget && (
+        <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <AlertTriangle size={18} className="text-amber-400 shrink-0" />
+          <div>
+            <p className="font-bold">Atención: Cerca del límite mensual ({monthlyBudgetPercent}%)</p>
+            <p className="text-[10px] text-amber-300/80">
+              Te quedan {userProfile.currency}{(userProfile.monthlyBudget - totalMonthSpent).toFixed(2)} para lo que resta del mes.
+            </p>
+          </div>
         </div>
       )}
 
       {/* Budget & Spending Health Card */}
-      <div className="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/90 border border-slate-800 shadow-md space-y-3">
+      <div className={`p-4 rounded-3xl border shadow-md space-y-3 ${
+        isDark 
+          ? 'bg-gradient-to-br from-[#2C3E50] to-[#1A252F] border-slate-700/80 text-white' 
+          : 'bg-white border-slate-200 text-slate-800'
+      }`}>
         {/* Top: Daily Limit */}
         <div>
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-slate-300 font-medium flex items-center gap-1.5">
+            <span className="font-medium flex items-center gap-1.5">
               <Wallet size={13} className="text-amber-400" /> Gasto de Hoy
             </span>
-            <span className="font-mono text-slate-200">
-              <strong className={totalTodaySpent > userProfile.dailyBudget ? 'text-rose-400' : 'text-emerald-400'}>
+            <span className="font-mono">
+              <strong className={totalTodaySpent > userProfile.dailyBudget ? 'text-rose-400' : 'text-[#2ECC71]'}>
                 {userProfile.currency}{totalTodaySpent.toFixed(2)}
               </strong>
-              <span className="text-slate-500"> / {userProfile.currency}{userProfile.dailyBudget.toFixed(2)}</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                {' '}/ {userProfile.currency}{userProfile.dailyBudget.toFixed(2)}
+              </span>
             </span>
           </div>
 
-          {/* Progress bar */}
-          <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+          {/* Daily Progress bar */}
+          <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 dailyBudgetPercent > 90
                   ? 'bg-rose-500'
                   : dailyBudgetPercent > 70
-                  ? 'bg-amber-500'
-                  : 'bg-emerald-500'
+                  ? 'bg-amber-400'
+                  : 'bg-[#2ECC71]'
               }`}
               style={{ width: `${dailyBudgetPercent}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+          <div className={`flex justify-between text-[10px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             <span>{dailyBudgetPercent}% del presupuesto diario</span>
             <span>
               {userProfile.dailyBudget - totalTodaySpent > 0
                 ? `Te quedan ${userProfile.currency}${(userProfile.dailyBudget - totalTodaySpent).toFixed(2)}`
-                : 'Exceso sobre presupuesto'}
+                : 'Exceso diario'}
             </span>
           </div>
         </div>
 
-        {/* Breakdown Pills: Transit vs Fuel */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
-          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
-            <div className="flex items-center gap-1 text-[11px] text-slate-400 mb-0.5">
-              <span>🚌</span> <span>Pasajes / Bus / Metro</span>
-            </div>
-            <p className="text-sm font-black font-mono text-amber-400">
-              {userProfile.currency}{publicTransitSpent.toFixed(2)}
-            </p>
-            <span className="text-[9px] text-slate-400">Total mes</span>
+        {/* Monthly Limit Progress */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="font-medium flex items-center gap-1.5">
+              <Layers size={13} className="text-blue-400" /> Consumo Mensual
+            </span>
+            <span className="font-mono">
+              <strong className={monthlyBudgetPercent > 100 ? 'text-rose-400' : 'text-[#2ECC71]'}>
+                {userProfile.currency}{totalMonthSpent.toFixed(2)}
+              </strong>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                {' '}/ {userProfile.currency}{userProfile.monthlyBudget.toFixed(2)}
+              </span>
+            </span>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
-            <div className="flex items-center gap-1 text-[11px] text-slate-400 mb-0.5">
-              <span>⛽</span> <span>Gasolina / Nafta</span>
+          <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                monthlyBudgetPercent > 100
+                  ? 'bg-rose-500'
+                  : monthlyBudgetPercent > 80
+                  ? 'bg-amber-400'
+                  : 'bg-[#2ECC71]'
+              }`}
+              style={{ width: `${Math.min(100, monthlyBudgetPercent)}%` }}
+            />
+          </div>
+          <div className={`flex justify-between text-[10px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <span>{monthlyBudgetPercent}% consumido este mes</span>
+            <span>
+              {userProfile.monthlyBudget - totalMonthSpent > 0
+                ? `Disponible: ${userProfile.currency}${(userProfile.monthlyBudget - totalMonthSpent).toFixed(2)}`
+                : 'Límite superado'}
+            </span>
+          </div>
+        </div>
+
+        {/* Breakdown Pills: Transit vs Fuel vs Peajes */}
+        <div className={`grid grid-cols-3 gap-2 pt-2 border-t ${isDark ? 'border-slate-700/80' : 'border-slate-200'}`}>
+          <div className={`p-2 rounded-xl border ${
+            isDark ? 'bg-[#1A252F] border-slate-700/60' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className={`flex items-center gap-1 text-[10px] mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span>🚌</span> <span className="truncate">Pasajes</span>
             </div>
-            <p className="text-sm font-black font-mono text-rose-400">
+            <p className="text-xs font-black font-mono text-amber-400">
+              {userProfile.currency}{publicTransitSpent.toFixed(2)}
+            </p>
+            <span className={`text-[8px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total mes</span>
+          </div>
+
+          <div className={`p-2 rounded-xl border ${
+            isDark ? 'bg-[#1A252F] border-slate-700/60' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className={`flex items-center gap-1 text-[10px] mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span>⛽</span> <span className="truncate">Gasolina</span>
+            </div>
+            <p className="text-xs font-black font-mono text-rose-400">
               {userProfile.currency}{fuelSpent.toFixed(2)}
             </p>
-            <span className="text-[9px] text-slate-400">Total mes</span>
+            <span className={`text-[8px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total mes</span>
+          </div>
+
+          <div className={`p-2 rounded-xl border ${
+            isDark ? 'bg-[#1A252F] border-slate-700/60' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className={`flex items-center gap-1 text-[10px] mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span>🛣️</span> <span className="truncate">Peajes</span>
+            </div>
+            <p className="text-xs font-black font-mono text-cyan-400">
+              {userProfile.currency}{peajesSpent.toFixed(2)}
+            </p>
+            <span className={`text-[8px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total mes</span>
           </div>
         </div>
       </div>
 
-      {/* FORMULARIO RÁPIDO DE PASAJES Y GASOLINA */}
-      <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 shadow-md space-y-4">
+      {/* METAPRESUPUESTO ALERTS BANNER */}
+      {isOverBudget && (
+        <div className="p-3.5 rounded-2xl bg-rose-500/20 border border-rose-500/50 flex items-start gap-2.5 text-rose-300 animate-pulse shadow-md shadow-rose-950/20">
+          <ShieldAlert size={20} className="shrink-0 text-rose-400 mt-0.5" />
+          <div className="space-y-0.5">
+            <h4 className="font-black text-xs text-rose-200 flex items-center gap-1.5">
+              <span>¡Alerta de MetaPresupuesto Superada!</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/30 text-rose-100 font-mono">
+                {monthlyBudgetPercent}%
+              </span>
+            </h4>
+            <p className="text-[11px] text-rose-300 leading-snug">
+              Has excedido tu presupuesto mensual por <strong>{userProfile.currency}{(totalMonthSpent - userProfile.monthlyBudget).toFixed(2)}</strong>. Te sugerimos priorizar transporte público o caminata.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isWarningBudget && !isOverBudget && (
+        <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-start gap-2.5 text-amber-200 shadow-sm">
+          <AlertTriangle size={18} className="shrink-0 text-amber-400 mt-0.5" />
+          <div className="space-y-0.5">
+            <h4 className="font-bold text-xs text-amber-300">
+              Alerta de Presupuesto: 80% Consumido
+            </h4>
+            <p className="text-[11px] text-amber-200/90 leading-snug">
+              Has alcanzado el {monthlyBudgetPercent}% de tu cuota mensual. Te quedan <strong>{userProfile.currency}{(userProfile.monthlyBudget - totalMonthSpent).toFixed(2)}</strong> disponibles.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* FORMULARIO RÁPIDO DE PASAJES, GASOLINA Y PEAJES */}
+      <div className={`p-4 rounded-3xl border shadow-md space-y-4 ${
+        isDark ? 'bg-[#2C3E50] border-slate-700' : 'bg-white border-slate-200'
+      }`}>
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-extrabold text-white flex items-center gap-1.5 uppercase tracking-wide">
             <Zap size={14} className="text-amber-400" />
-            <span>Registro Rápido Inmediato</span>
+            <span>Registro Rápido de Gastos</span>
           </h3>
           <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-semibold">
-            1-Tap Express
+            Pasajes • Gasolina • Peajes
           </span>
         </div>
 
-        {/* Tab switch: Pasajes vs Gasolina vs Recargas vs Otros */}
-        <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+        {/* Tab switch: Pasajes vs Gasolina vs Peajes vs Recargas vs Otros */}
+        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-950 rounded-2xl border border-slate-800">
           <button
             type="button"
             onClick={() => handleTypeTabChange('pasaje')}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
               activeTypeTab === 'pasaje'
                 ? 'bg-amber-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -270,7 +410,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
           <button
             type="button"
             onClick={() => handleTypeTabChange('gasolina')}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
               activeTypeTab === 'gasolina'
                 ? 'bg-rose-500 text-white shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -282,8 +422,21 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
 
           <button
             type="button"
+            onClick={() => handleTypeTabChange('peaje')}
+            className={`py-2 px-1 rounded-xl text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+              activeTypeTab === 'peaje'
+                ? 'bg-cyan-500 text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="text-sm leading-none">🛣️</span>
+            <span className="truncate">Peaje</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => handleTypeTabChange('recarga')}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
               activeTypeTab === 'recarga'
                 ? 'bg-blue-500 text-white shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -296,7 +449,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
           <button
             type="button"
             onClick={() => handleTypeTabChange('otro')}
-            className={`py-2 px-1 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-[10px] font-bold flex flex-col items-center gap-0.5 transition-all ${
               activeTypeTab === 'otro'
                 ? 'bg-emerald-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -306,6 +459,43 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
             <span className="truncate">Otros</span>
           </button>
         </div>
+
+        {/* Sub-Category selector within active tab */}
+        {activeTypeTab === 'peaje' && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('peaje');
+                setNote('Peaje autopista urbana');
+                if (userProfile.soundEnabled) playHapticSound('tap');
+              }}
+              className="p-2.5 rounded-xl border border-cyan-500 bg-cyan-500/10 text-white ring-1 ring-cyan-400 flex items-center gap-2 text-xs font-semibold"
+            >
+              <span className="text-lg">🛣️</span>
+              <div className="text-left">
+                <p className="leading-tight">Peaje Urbano</p>
+                <span className="text-[10px] text-cyan-300">Autopista / TAG</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory('peaje');
+                setNote('Peaje troncal interurbano');
+                if (userProfile.soundEnabled) playHapticSound('tap');
+              }}
+              className="p-2.5 rounded-xl border border-slate-700 bg-slate-800/40 text-slate-300 hover:text-white flex items-center gap-2 text-xs font-semibold"
+            >
+              <span className="text-lg">🚧</span>
+              <div className="text-left">
+                <p className="leading-tight">Peaje Troncal</p>
+                <span className="text-[10px] text-slate-400">Ruta interprovincial</span>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Sub-Category selector within active tab */}
         {activeTypeTab === 'pasaje' && (

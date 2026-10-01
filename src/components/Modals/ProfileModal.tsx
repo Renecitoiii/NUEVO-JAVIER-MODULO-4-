@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, User, GraduationCap, Briefcase, DollarSign, RotateCcw, Volume2 } from 'lucide-react';
+import { X, Check, User, GraduationCap, Briefcase, DollarSign, RotateCcw, Volume2, Droplets, LogOut } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { playHapticSound } from '../../utils/haptics';
 
@@ -9,6 +9,7 @@ interface ProfileModalProps {
   userProfile: UserProfile;
   onSaveProfile: (profile: UserProfile) => void;
   onResetData: () => void;
+  onLogout?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -17,6 +18,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   userProfile,
   onSaveProfile,
   onResetData,
+  onLogout,
 }) => {
   const [name, setName] = useState(userProfile.name);
   const [role, setRole] = useState<'estudiante' | 'trabajador'>(userProfile.role);
@@ -24,6 +26,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [currency, setCurrency] = useState(userProfile.currency);
   const [dailyBudget, setDailyBudget] = useState(userProfile.dailyBudget.toString());
   const [monthlyBudget, setMonthlyBudget] = useState(userProfile.monthlyBudget.toString());
+  const [dailyWaterGoalMl, setDailyWaterGoalMl] = useState(
+    (userProfile.dailyWaterGoalMl || 2000).toString()
+  );
   const [soundEnabled, setSoundEnabled] = useState(userProfile.soundEnabled);
 
   if (!isOpen) return null;
@@ -32,12 +37,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     e.preventDefault();
     if (soundEnabled) playHapticSound('success');
     onSaveProfile({
+      ...userProfile,
       name: name.trim() || 'Usuario',
       role,
       institutionOrCompany: institutionOrCompany.trim() || (role === 'estudiante' ? 'Campus Universitario' : 'Empresa'),
       currency,
       dailyBudget: parseFloat(dailyBudget) || 5,
       monthlyBudget: parseFloat(monthlyBudget) || 120,
+      dailyWaterGoalMl: parseInt(dailyWaterGoalMl, 10) || 2000,
       soundEnabled,
     });
     onClose();
@@ -198,6 +205,41 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
+          {/* Daily Water Goal Input */}
+          <div className="p-3 rounded-2xl bg-cyan-950/30 border border-cyan-500/30">
+            <label className="block text-cyan-300 font-semibold mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Droplets size={14} className="text-cyan-400" />
+                <span>Meta de Hidratación Diaria</span>
+              </span>
+              <span className="font-mono text-cyan-400 font-bold">{dailyWaterGoalMl} ml</span>
+            </label>
+            <input
+              type="number"
+              step="100"
+              min="500"
+              max="5000"
+              value={dailyWaterGoalMl}
+              onChange={(e) => setDailyWaterGoalMl(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-cyan-200 font-mono focus:outline-none focus:border-cyan-400 text-xs"
+            />
+            <div className="flex gap-1 mt-1.5">
+              {[1500, 2000, 2500, 3000].map((ml) => (
+                <button
+                  key={ml}
+                  type="button"
+                  onClick={() => {
+                    setDailyWaterGoalMl(ml.toString());
+                    if (soundEnabled) playHapticSound('tap');
+                  }}
+                  className="flex-1 text-[9px] py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-mono"
+                >
+                  {ml}ml
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Sound Toggle */}
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-800/50 border border-slate-800">
             <div className="flex items-center gap-2">
@@ -214,6 +256,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               className="accent-emerald-500 w-4 h-4 cursor-pointer"
             />
           </div>
+
+          {/* Switch User / Logout Button */}
+          {onLogout && (
+            <div className="pt-1 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onLogout();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-amber-500/20"
+              >
+                <LogOut size={14} />
+                <span>Cerrar Sesión / Cambiar de Usuario</span>
+              </button>
+            </div>
+          )}
 
           {/* Reset Demo Data Button */}
           <div className="pt-1 border-t border-slate-800">

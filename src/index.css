@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+:root {
+  --color-primary: #2ECC71;
+  --color-primary-dark: #27ae60;
+  --color-surface-dark: #2C3E50;
+  --color-surface-darker: #1A252F;
+}
+
+/* Custom Emerald & Navy classes */
+.bg-emerald-brand {
+  background-color: #2ECC71;
+}
+
+.text-emerald-brand {
+  color: #2ECC71;
+}
+
+.border-emerald-brand {
+  border-color: #2ECC71;
+}
+
+.bg-navy-dark {
+  background-color: #2C3E50;
+}
+
+.border-navy-dark {
+  border-color: #2C3E50;
+}
+
+/* Smooth Android theme transitions */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

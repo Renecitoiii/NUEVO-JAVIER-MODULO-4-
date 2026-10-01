@@ -18,7 +18,7 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
-export function playHapticSound(type: 'tap' | 'success' | 'delete' | 'toggle' = 'tap') {
+export function playHapticSound(type: 'tap' | 'success' | 'delete' | 'toggle' | 'error' = 'tap') {
   try {
     // If native vibration is supported
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -26,6 +26,7 @@ export function playHapticSound(type: 'tap' | 'success' | 'delete' | 'toggle' = 
       else if (type === 'success') navigator.vibrate([15, 30, 20]);
       else if (type === 'delete') navigator.vibrate([20, 20]);
       else if (type === 'toggle') navigator.vibrate(10);
+      else if (type === 'error') navigator.vibrate([30, 40, 30]);
     }
 
     const ctx = getAudioContext();
@@ -72,6 +73,14 @@ export function playHapticSound(type: 'tap' | 'success' | 'delete' | 'toggle' = 
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
       osc.start(now);
       osc.stop(now + 0.05);
+    } else if (type === 'error') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.setValueAtTime(180, now + 0.08);
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      osc.start(now);
+      osc.stop(now + 0.16);
     }
   } catch {
     // Ignore audio permission or playback issues silently

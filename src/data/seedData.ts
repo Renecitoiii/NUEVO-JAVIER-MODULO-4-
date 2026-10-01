@@ -1,4 +1,4 @@
-import { Trip, Expense, UserProfile } from '../types';
+import { Trip, Expense, UserProfile, WaterLog } from '../types';
 import { calculateTripCO2 } from '../utils/transportUtils';
 
 export function getTodayDateString(offsetDays = 0): string {
@@ -7,15 +7,96 @@ export function getTodayDateString(offsetDays = 0): string {
   return d.toISOString().split('T')[0];
 }
 
+export const SAMPLE_PROFILES: UserProfile[] = [
+  {
+    id: 'user-student-1',
+    name: 'Camila Ríos',
+    email: 'camila.rios@universidad.edu',
+    role: 'estudiante',
+    institutionOrCompany: 'Universidad Central - Campus Norte',
+    currency: '$',
+    dailyBudget: 8.50,
+    monthlyBudget: 150.00,
+    dailyWaterGoalMl: 2000,
+    soundEnabled: true,
+    isLoggedIn: false,
+  },
+  {
+    id: 'user-worker-1',
+    name: 'Rodrigo Morales',
+    email: 'rodrigo.m@techcorp.com',
+    role: 'trabajador',
+    institutionOrCompany: 'Distrito Financiero - Torre Empresarial',
+    currency: '$',
+    dailyBudget: 25.00,
+    monthlyBudget: 350.00,
+    dailyWaterGoalMl: 2200,
+    soundEnabled: true,
+    isLoggedIn: false,
+  },
+];
+
 export const INITIAL_USER_PROFILE: UserProfile = {
-  name: 'Camila Ríos',
-  role: 'estudiante', // 'estudiante' o 'trabajador'
-  institutionOrCompany: 'Universidad Central - Campus Norte',
-  currency: '$',
-  dailyBudget: 8.50,
-  monthlyBudget: 150.00,
-  soundEnabled: true,
+  ...SAMPLE_PROFILES[0],
+  isLoggedIn: false,
 };
+
+export function getInitialWaterLogs(): WaterLog[] {
+  const today = getTodayDateString(0);
+  const yesterday = getTodayDateString(1);
+
+  return [
+    {
+      id: 'water-today-1',
+      date: today,
+      time: '07:45',
+      amountMl: 250,
+      tripId: 'trip-today-1',
+      context: 'durante_viaje',
+      note: 'Termo de agua en trayecto en metro',
+    },
+    {
+      id: 'water-today-2',
+      date: today,
+      time: '11:15',
+      amountMl: 500,
+      context: 'rutina',
+      note: 'Botella de agua en clases / descanso',
+    },
+    {
+      id: 'water-today-3',
+      date: today,
+      time: '14:20',
+      amountMl: 250,
+      context: 'despues_viaje' as any,
+      note: 'Hidratación post-caminata',
+    },
+    {
+      id: 'water-yest-1',
+      date: yesterday,
+      time: '08:15',
+      amountMl: 500,
+      context: 'durante_viaje',
+      note: 'Hidratación durante pedaleo en bici',
+    },
+    {
+      id: 'water-yest-2',
+      date: yesterday,
+      time: '13:00',
+      amountMl: 500,
+      context: 'rutina',
+      note: 'Almuerzo y recarga termo',
+    },
+    {
+      id: 'water-yest-3',
+      date: yesterday,
+      time: '19:15',
+      amountMl: 250,
+      context: 'durante_viaje',
+      note: 'Sorbos en viaje de retorno',
+    },
+  ];
+}
 
 export function getInitialTrips(): Trip[] {
   const today = getTodayDateString(0);
